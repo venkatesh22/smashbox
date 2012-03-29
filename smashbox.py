@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
-"""Smash Box. A simple but configurable load testing script that will
-request an URL on a number of threads [-t] for a time in minutes [-m]. The -u
+"""Smash Box. A simple but configurable load testing script that will request
+ an URL on a number of threads [-t] for a time in minutes [-m]. The -u
  (--url) argument is required. By default Smash Box will run on 1 thread for
-  1 minute. See help for more details."""
+ 1 minute with a 15 second pause between kicking off threads. See help for
+ more details."""
 
 import logging
 import urllib2
@@ -18,11 +19,9 @@ __license__ = "MIT"
 __version__ = "1.0"
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG, format='%(name)s [%(levelname)s]: %(message)s')
+logging.basicConfig(level=logging.DEBUG, format='%(name)s [%(levelname)s]: %' \
+                                                '(message)s')
 logger = logging.getLogger("Smash Box")
-
-# Time to pause between kicking off new threads
-THREAD_START_DELAY = 30 #seconds
 
 #Define a timeout event
 timeout_event = threading.Event()
@@ -92,10 +91,12 @@ class LoadTest(object):
     URL, controlling when threads are initialised and providing global stats
      on completion."""
 
-    def trigger(self, url, number_of_threads, minutes_at_peak_qps):
+    def trigger(self, url, number_of_threads, minutes_at_peak_qps,
+                thread_start_delay):
         """ Trigger a load test for a given URL, number of threads and time
         at peak QPS."""
-        runtime = (THREAD_START_DELAY * number_of_threads + minutes_at_peak_qps * 60)
+        runtime = (thread_start_delay * number_of_threads +
+                   minutes_at_peak_qps * 60)
         logger.info("Total load test time will be: %d seconds" % runtime)
         start_time = end_time = time.time()
         counter = Counter()
@@ -104,7 +105,7 @@ class LoadTest(object):
             for i in xrange(number_of_threads):
                 thread = ThreadedRequest(counter, url=url)
                 thread.start()
-                time.sleep(THREAD_START_DELAY)
+                time.sleep(thread_start_delay)
             logger.info("All threads active")
             time.sleep(minutes_at_peak_qps * 60)
             end_time = time.time()
@@ -121,7 +122,8 @@ class LoadTest(object):
         # Log some stats
         total_time = end_time - start_time
         total_requests = counter.value
-        logger.info("Total time: %d seconds, total requests: %d" % (total_time, total_requests))
+        logger.info("Total time: %d seconds, total requests: %d" %
+                    (total_time, total_requests))
         logger.info("Req/sec: %.2f" % (total_requests / total_time))
         logger.info("All done.")
 
@@ -147,16 +149,27 @@ def main():
         "-m", "--minutes",
         dest="minutes_at_peak_qps",
         type=int,
-        help="how many minutes the load test should run with all guns blazing. Default = 1.",
+        help="how many minutes the test should run with all guns blazing " \
+             "Default = 1.",
         metavar="M",
         default=1
+    )
+    parser.add_argument(
+        "-p", "--pause",
+        dest="thread_start_delay",
+        type=int,
+        help="time in seconds to pause between kicking off new threads. " \
+             "Default = 15.",
+        metavar="M",
+        default=15
     )
 
     args = parser.parse_args()
 
     # Start the load test
     load_test = LoadTest()
-    load_test.trigger(args.url, args.number_of_threads, args.minutes_at_peak_qps)
+    load_test.trigger(args.url, args.number_of_threads,
+                      args.minutes_at_peak_qps, args.thread_start_delay)
 
 if __name__ == '__main__':
     main()
