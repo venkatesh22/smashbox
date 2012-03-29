@@ -54,12 +54,19 @@ class ThreadedRequest(threading.Thread):
         """ Use urllib2 to make a request to an URL, logging the status code."""
         if not self.url.startswith("http://"):
             self.url = "http://%s" % self.url
-        response = urllib2.urlopen(self.url)
-        status_code = response.getcode()
-        if status_code != 200:
-            logger.warning("Bad response.")
-        else:
-            logger.info("Status: %s, URL: %s " % (status_code, self.url))
+        try:
+            response = urllib2.urlopen(self.url)
+            status_code = response.getcode()
+            if status_code != 200:
+                logger.warning("Bad response.")
+            else:
+                logger.info("Status: %s, URL: %s " % (status_code, self.url))
+            return True
+        except urllib2.HTTPError, e:
+            logger.error("HTTPError: %s, URL: %s " % (e.code, self.url))
+        except urllib2.URLError, e:
+            logger.error("URLError: %s, URL: %s " % (e.reason, self.url))
+        return False
 
     def run(self):
         """ Call make_request() until a timeout event is triggered,
@@ -72,9 +79,10 @@ class ThreadedRequest(threading.Thread):
         while not timeout_event.is_set():
             try:
                 logger.info("Request %s on: %s" % (times_run + 1, thread_name))
-                self.make_request()
+                request_success = self.make_request()
                 times_run += 1
-                self.counter.increment()
+                if request_success:
+                    self.counter.increment()
             except socket.timeout:
                 pass
         logger.info("%s finished." % thread_name)
